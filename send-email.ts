@@ -1,0 +1,155 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import nodemailer from 'nodemailer';
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // ✅ CORS - Permite seu domínio frontend
+  res.setHeader('Access-Control-Allow-Origin', 'https://cms-42v7.vercel.app');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  
+  // ✅ CORS preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  // ✅ Só aceita POST
+  if (req.method !== 'POST') {
+    return res.status(405).json({
+      success: false,
+      message: 'Método não permitido. Use POST.'
+    });
+  }
+  
+  try {
+    console.log('📥 Recebendo candidatura...');
+    
+    // ✅ Aceita JSON
+    if (!req.headers['content-type']?.includes('application/json')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Envie dados como JSON (Content-Type: application/json)'
+      });
+    }
+    
+    const { nome, email, telefone, mensagem, arquivo_nome } = req.body;
+    
+    // Validação
+    if (!nome || !email || !telefone) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nome, email e telefone são obrigatórios.'
+      });
+    }
+    
+    console.log('📄 Dados:', { nome, email, telefone });
+    
+    // ✅ Configuração SMTP da sua empresa
+    const transporter = nodemailer.createTransport({
+      host: 'mail.centroms.com.br',
+      port: 587,
+      secure: false,
+      auth: {
+        user: 'suporte.ti@centroms.com.br',
+        pass: process.env.EMAIL_PASSWORD || 'Carro@201',
+      },
+      tls: {
+        rejectUnauthorized: false,
+      }
+    });
+    
+    // Testa conexão SMTP
+    await transporter.verify();
+    console.log('✅ SMTP conectado');
+    
+    // Template do email
+    const mailOptions = {
+      from: `"Site Centro Médico Sapiranga" <suporte.ti@centroms.com.br>`,
+      to: process.env.RH_EMAIL || 'suporte.ti@centroms.com.br',
+      replyTo: email,
+      subject: `📋 Nova Candidatura - ${nome}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: #1a5f7a; color: white; padding: 20px; border-radius: 5px 5px 0 0; }
+            .content { background: #f9f9f9; padding: 20px; border-radius: 0 0 5px 5px; }
+            .info-item { margin: 10px 0; }
+            .label { font-weight: bold; color: #555; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🎯 Nova Candidatura Recebida</h1>
+              <p>Centro Médico Sapiranga</p>
+            </div>
+            <div class="content">
+              <h2>👤 Dados do Candidato</h2>
+              <div class="info-item">
+                <span class="label">Nome:</span> ${nome}
+              </div>
+              <div class="info-item">
+                <span class="label">Email:</span> ${email}
+              </div>
+              <div class="info-item">
+                <span class="label">Telefone:</span> ${telefone}
+              </div>
+              ${mensagem ? `
+              <div class="info-item">
+                <span class="label">Mensagem:</span><br>
+                ${mensagem.replace(/\n/g, '<br>')}
+              </div>
+              ` : ''}
+              ${arquivo_nome ? `
+              <div class="info-item">
+                <span class="label">Currículo:</span> ${arquivo_nome}
+              </div>
+              ` : ''}
+              <hr>
+              <p><em>Enviado automaticamente do formulário do site.</em></p>
+              <p><strong>Data:</strong> ${new Date().toLocaleString('pt-BR')}</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `NOVA CANDIDATURA\n\nNome: ${nome}\nEmail: ${email}\nTelefone: ${telefone}\nMensagem: ${mensagem || 'Nenhuma'}\nCurrículo: ${arquivo_nome || 'Não informado'}\n\nData: ${new Date().toLocaleString('pt-BR')}`
+    };
+    
+    // Envia email
+    const info = await transporter.sendMail(mailOptions);
+    
+    console.log('✅ Email enviado! ID:', info.messageId);
+    
+    return res.status(200).json({
+      success: true,
+      message: '✅ Candidatura enviada com sucesso! Entraremos em contato em breve.',
+      messageId: info.messageId,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error: any) {
+    console.error('❌ Erro:', error);
+    
+    let errorMessage = 'Erro ao enviar candidatura. Tente novamente.';
+    
+    if (error.code === 'EAUTH') {
+      errorMessage = 'Erro de autenticação no email. Verifique as credenciais.';
+    } else if (error.code === 'ECONNECTION') {
+      errorMessage = 'Não foi possível conectar ao servidor de email.';
+    } else if (error.code === 'ENOTFOUND') {
+      errorMessage = 'Servidor de email não encontrado.';
+    }
+    
+    return res.status(500).json({
+      success: false,
+      message: errorMessage,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+}
