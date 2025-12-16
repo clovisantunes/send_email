@@ -44,26 +44,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     console.log('📄 Dados:', { nome, email, telefone });
     
-// ✅ Configuração SMTP ajustada para porta 587 com STARTTLS FORÇADO
-const transporter = nodemailer.createTransport({
-  host: 'mail.centroms.com.br',
-  port: 587,
-  secure: false, // IMPORTANTE: 'false' para STARTTLS na porta 587
-  // FORÇA a inicialização do TLS. Se o servidor não suportar, a conexão falha.
-  requireTLS: true,
-  // Conexão mais tolerante para diagnóstico
-  tls: {
-    rejectUnauthorized: false // Aceita certificados autoassinados, se houver
-  },
-  auth: {
-    user: 'suporte.ti@centroms.com.br',
-    pass: process.env.EMAIL_PASSWORD || 'Carro@201',
-  },
-  // ATIVA LOGS DETALHADOS (CRUCIAL PARA DIAGNÓSTICO)
-  debug: true,
-  logger: true
-});
+    // 🔍 DEBUG DETALHADO DAS CREDENCIAIS
+    const rawPasswordFromEnv = process.env.EMAIL_PASSWORD;
+    console.log('🔐 DEBUG CREDENCIAIS:');
+    console.log('1. Variável de ambiente (RAW):', JSON.stringify(rawPasswordFromEnv));
+    console.log('2. Tipo:', typeof rawPasswordFromEnv);
+    
+    let decodedPassword = 'Carro@201'; // Fallback
+    
+    if (rawPasswordFromEnv) {
+      // Tenta decodificar apenas se contém %
+      if (rawPasswordFromEnv.includes('%')) {
+        decodedPassword = decodeURIComponent(rawPasswordFromEnv);
+        console.log('3. Após decodeURIComponent:', JSON.stringify(decodedPassword));
+      } else {
+        decodedPassword = rawPasswordFromEnv;
+        console.log('3. Usando raw (sem decode):', JSON.stringify(decodedPassword));
+      }
+    }
+    
+    console.log('4. Esperado:', JSON.stringify('Carro@201'));
+    console.log('5. Usuário:', 'suporte.ti@centroms.com.br');
+    
+    // ✅ CONFIGURAÇÃO SIMPLIFICADA (sem propriedades extras)
+    const transporter = nodemailer.createTransport({
+      host: 'mail.centroms.com.br',
+      port: 587,
+      secure: false, // false para STARTTLS
+      requireTLS: true,
+      tls: {
+        rejectUnauthorized: false
+      },
+      auth: {
+        user: 'suporte.ti@centroms.com.br',
+        pass: decodedPassword, // Senha já decodificada
+      },
+      // Configurações de debug CORRETAS para o Nodemailer
+      debug: true,
+      logger: true
+    } as any); // 'as any' para evitar problemas de tipos
+    
     // Testa conexão SMTP
+    console.log('🔍 Testando conexão SMTP...');
     await transporter.verify();
     console.log('✅ SMTP conectado');
     
@@ -127,6 +149,7 @@ const transporter = nodemailer.createTransport({
     };
     
     // Envia email
+    console.log('📤 Enviando email...');
     const info = await transporter.sendMail(mailOptions);
     
     console.log('✅ Email enviado! ID:', info.messageId);
@@ -141,10 +164,18 @@ const transporter = nodemailer.createTransport({
   } catch (error: any) {
     console.error('❌ Erro:', error);
     
+    // Log detalhado do erro SMTP
+    if (error.code === 'EAUTH') {
+      console.error('🔍 DETALHES DO ERRO AUTH:');
+      console.error('- Código:', error.code);
+      console.error('- Resposta:', error.response);
+      console.error('- Comando:', error.command);
+    }
+    
     let errorMessage = 'Erro ao enviar candidatura. Tente novamente.';
     
     if (error.code === 'EAUTH') {
-      errorMessage = 'Erro de autenticação no email. Verifique as credenciais.';
+      errorMessage = `Erro de autenticação: ${error.response || 'Credenciais inválidas'}`;
     } else if (error.code === 'ECONNECTION') {
       errorMessage = 'Não foi possível conectar ao servidor de email.';
     } else if (error.code === 'ENOTFOUND') {
