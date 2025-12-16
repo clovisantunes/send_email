@@ -66,24 +66,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('4. Esperado:', JSON.stringify('Carro@201'));
     console.log('5. Usuário:', 'suporte.ti@centroms.com.br');
     
-    // ✅ CONFIGURAÇÃO SIMPLIFICADA (sem propriedades extras)
-    const transporter = nodemailer.createTransport({
-      host: 'mail.centroms.com.br',
-      port: 587,
-      secure: false, // false para STARTTLS
-      requireTLS: true,
-      tls: {
-        rejectUnauthorized: false
-      },
-      auth: {
-        user: 'suporte.ti@centroms.com.br',
-        pass: decodedPassword, // Senha já decodificada
-      },
-      // Configurações de debug CORRETAS para o Nodemailer
-      debug: true,
-      logger: true
-    } as any); // 'as any' para evitar problemas de tipos
-    
+// NO TRANSPORTER DO SEU CÓDIGO ORIGINAL
+const transporter = nodemailer.createTransport({
+  host: 'mail.centroms.com.br',
+  port: 587,
+  secure: false,
+  requireTLS: true,
+  tls: {
+    rejectUnauthorized: false,
+  },
+  auth: {
+    user: 'suporte.ti@centroms.com.br',
+    pass: process.env.EMAIL_PASSWORD, // ← DIRETO, SEM DECODE
+  },
+  debug: true,
+  logger: true
+});
     // Testa conexão SMTP
     console.log('🔍 Testando conexão SMTP...');
     await transporter.verify();
