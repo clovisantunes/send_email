@@ -44,20 +44,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     console.log('📄 Dados:', { nome, email, telefone });
     
-    // ✅ Configuração SMTP da sua empresa
-    const transporter = nodemailer.createTransport({
-      host: 'mail.centroms.com.br',
-      port: 587,
-      secure: false,
-      auth: {
-        user: 'suporte.ti@centroms.com.br',
-        pass: process.env.EMAIL_PASSWORD || 'Carro@201',
-      },
-      tls: {
-        rejectUnauthorized: false,
-      }
-    });
-    
+// ✅ Configuração SMTP ajustada para porta 587 com STARTTLS FORÇADO
+const transporter = nodemailer.createTransport({
+  host: 'mail.centroms.com.br',
+  port: 587,
+  secure: false, // IMPORTANTE: 'false' para STARTTLS na porta 587
+  // FORÇA a inicialização do TLS. Se o servidor não suportar, a conexão falha.
+  requireTLS: true,
+  // Conexão mais tolerante para diagnóstico
+  tls: {
+    rejectUnauthorized: false // Aceita certificados autoassinados, se houver
+  },
+  auth: {
+    user: 'suporte.ti@centroms.com.br',
+    pass: process.env.EMAIL_PASSWORD || 'Carro@201',
+  },
+  // ATIVA LOGS DETALHADOS (CRUCIAL PARA DIAGNÓSTICO)
+  debug: true,
+  logger: true
+});
     // Testa conexão SMTP
     await transporter.verify();
     console.log('✅ SMTP conectado');
