@@ -3,15 +3,36 @@ import nodemailer from 'nodemailer';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // ----------------------------
-  // CORS
+  // CORS - Configuração mais abrangente
   // ----------------------------
-  res.setHeader('Access-Control-Allow-Origin', 'https://cms-42v7.vercel.app');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
+  const allowedOrigins = [
+    'https://cms-42v7.vercel.app',
+    'https://cms-jet-one.vercel.app',
+    'https://centroms.com.br',
+    'http://localhost:3000',
+    'http://localhost:5173'
+  ];
+  
+  const origin = req.headers.origin || '';
+  const isAllowedOrigin = allowedOrigins.includes(origin);
+  
+  // Configuração de CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization');
+  res.setHeader('Access-Control-Max-Age', '86400'); // 24 horas
+  
+  if (isAllowedOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    // Permite qualquer origem para desenvolvimento (remova em produção)
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
 
+  // Lidar com preflight request
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    res.status(200).end();
+    return;
   }
 
   if (req.method !== 'POST') {
@@ -25,7 +46,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ----------------------------
     // Validação de Content-Type
     // ----------------------------
-    if (!req.headers['content-type']?.includes('application/json')) {
+    const contentType = req.headers['content-type'] || '';
+    if (!contentType.includes('application/json')) {
       return res.status(400).json({
         success: false,
         message: 'Envie os dados como JSON (application/json).'
@@ -54,8 +76,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     });
 
-    // Teste de conexão SMTP (opcional, mas útil)
-    await transporter.verify();
+    // Teste de conexão SMTP
+    try {
+      await transporter.verify();
+      console.log('SMTP connection verified');
+    } catch (smtpError) {
+      console.error('SMTP verification failed:', smtpError);
+      return res.status(500).json({
+        success: false,
+        message: 'Erro na configuração do servidor de email.'
+      });
+    }
 
     // ----------------------------
     // Email
@@ -153,6 +184,7 @@ Data: ${new Date().toLocaleString('pt-BR')}
     };
 
     await transporter.sendMail(mailOptions);
+    console.log('Email enviado com sucesso');
 
     return res.status(200).json({
       success: true,
@@ -164,7 +196,8 @@ Data: ${new Date().toLocaleString('pt-BR')}
 
     return res.status(500).json({
       success: false,
-      message: 'Erro ao enviar a candidatura. Tente novamente mais tarde.'
+      message: 'Erro ao enviar a candidatura. Tente novamente mais tarde.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 }
