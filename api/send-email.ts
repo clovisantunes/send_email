@@ -1,13 +1,20 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import nodemailer from 'nodemailer';
+import Busboy from 'busboy';
+
+export const config = {
+  api: {
+    bodyParser: false, 
+  },
+};
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // ----------------------------
-  // CORS
-  // ----------------------------
-  res.setHeader('Access-Control-Allow-Origin', 'https://cms-42v7.vercel.app');
+  const allowedOrigins = ['https://cms-42v7.vercel.app', 'https://cms-jet-one.vercel.app'];
+  const allowedOrigin = allowedOrigins.includes(req.headers.origin || '') ? (req.headers.origin || allowedOrigins[0]) : allowedOrigins[0];
+
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
 
   if (req.method === 'OPTIONS') {
@@ -15,156 +22,105 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({
-      success: false,
-      message: 'Método não permitido. Use POST.'
-    });
+    return res.status(405).json({ success: false, message: 'Método não permitido' });
   }
 
   try {
-    // ----------------------------
-    // Validação de Content-Type
-    // ----------------------------
-    if (!req.headers['content-type']?.includes('application/json')) {
-      return res.status(400).json({
-        success: false,
-        message: 'Envie os dados como JSON (application/json).'
-      });
+    const busboy = Busboy({ headers: req.headers });
+
+
+    interface EmailFields {
+      nome?: string;
+      email?: string;
+      telefone?: string;
+      mensagem?: string;
+      [key: string]: string | undefined;
     }
 
-    const { nome, email, telefone, mensagem, arquivo_nome } = req.body;
-
-    if (!nome || !email || !telefone) {
-      return res.status(400).json({
-        success: false,
-        message: 'Nome, email e telefone são obrigatórios.'
-      });
+    interface FileInfo {
+      filename: string;
+      mimeType: string;
     }
 
-    // ----------------------------
-    // Transporter BREVO
-    // ----------------------------
-    const transporter = nodemailer.createTransport({
-      host: 'smtp-relay.brevo.com',
-      port: 587,
-      secure: false,
-      auth: {
-        user: process.env.BREVO_SMTP_USER,
-        pass: process.env.BREVO_SMTP_KEY,
-      },
+
+        const fields: EmailFields = {};
+        let fileBuffer: Buffer | null = null;
+        let fileName = '';
+        let fileMime = '';
+
+        busboy.on('field', (name: string, value: string) => {
+          fields[name] = value;
+        });
+
+    busboy.on('file', (_name, file, info) => {
+      fileName = info.filename;
+      fileMime = info.mimeType;
+
+      const chunks: Buffer[] = [];
+      file.on('data', (data) => chunks.push(data));
+      file.on('end', () => {
+        fileBuffer = Buffer.concat(chunks);
+      });
     });
 
-    // Teste de conexão SMTP (opcional, mas útil)
-    await transporter.verify();
+    busboy.on('finish', async () => {
+      const { nome, email, telefone, mensagem } = fields;
 
-    // ----------------------------
-    // Email
-    // ----------------------------
-    const mailOptions = {
-      from: '"Site Centro Médico Sapiranga" <suporte.ti@centroms.com.br>',
-      to: process.env.RH_EMAIL || 'suporte.ti@centroms.com.br',
-      replyTo: email,
-      subject: `📋 Nova Candidatura - ${nome}`,
-      html: `
-        <!DOCTYPE html>
-        <html lang="pt-BR">
-        <head>
-          <meta charset="UTF-8" />
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              background: #f4f4f4;
-              padding: 20px;
-              color: #333;
-            }
-            .container {
-              max-width: 600px;
-              margin: 0 auto;
-              background: #ffffff;
-              border-radius: 6px;
-              overflow: hidden;
-            }
-            .header {
-              background: #1a5f7a;
-              color: #ffffff;
-              padding: 20px;
-            }
-            .content {
-              padding: 20px;
-            }
-            .item {
-              margin-bottom: 10px;
-            }
-            .label {
-              font-weight: bold;
-            }
-            .footer {
-              font-size: 12px;
-              color: #777;
-              padding: 15px;
-              border-top: 1px solid #eee;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h2>Nova candidatura recebida</h2>
-              <p>Centro Médico Sapiranga</p>
-            </div>
-            <div class="content">
-              <div class="item"><span class="label">Nome:</span> ${nome}</div>
-              <div class="item"><span class="label">Email:</span> ${email}</div>
-              <div class="item"><span class="label">Telefone:</span> ${telefone}</div>
+      if (!nome || !email || !telefone) {
+        return res.status(400).json({
+          success: false,
+          message: 'Nome, email e telefone são obrigatórios',
+        });
+      }
 
-              ${
-                mensagem
-                  ? `<div class="item"><span class="label">Mensagem:</span><br/>${mensagem.replace(
-                      /\n/g,
-                      '<br/>'
-                    )}</div>`
-                  : ''
-              }
+      const transporter = nodemailer.createTransport({
+        host: 'smtp-relay.brevo.com',
+        port: 587,
+        secure: false,
+        auth: {
+          user: process.env.BREVO_SMTP_USER,
+          pass: process.env.BREVO_SMTP_KEY,
+        },
+      });
 
-              ${
-                arquivo_nome
-                  ? `<div class="item"><span class="label">Currículo:</span> ${arquivo_nome}</div>`
-                  : ''
-              }
-            </div>
-            <div class="footer">
-              Enviado automaticamente pelo site em ${new Date().toLocaleString('pt-BR')}
-            </div>
-          </div>
-        </body>
-        </html>
-      `,
-      text: `
-Nova candidatura recebida
+      const attachments = fileBuffer
+        ? [
+            {
+              filename: fileName,
+              content: fileBuffer,
+              contentType: fileMime,
+            },
+          ]
+        : [];
 
+      await transporter.sendMail({
+        from: '"Site Centro Médico Sapiranga" <suporte.ti@centroms.com.br>',
+        to: process.env.RH_EMAIL,
+        replyTo: email,
+        subject: `Nova candidatura - ${nome}`,
+        text: `
 Nome: ${nome}
 Email: ${email}
 Telefone: ${telefone}
-Mensagem: ${mensagem || 'Não informada'}
-Currículo: ${arquivo_nome || 'Não informado'}
 
-Data: ${new Date().toLocaleString('pt-BR')}
-      `
-    };
+Mensagem:
+${mensagem || 'Não informada'}
+        `,
+        attachments,
+      });
 
-    await transporter.sendMail(mailOptions);
-
-    return res.status(200).json({
-      success: true,
-      message: 'Candidatura enviada com sucesso.'
+      return res.status(200).json({
+        success: true,
+        message: 'Candidatura enviada com anexo',
+      });
     });
 
-  } catch (error: any) {
-    console.error('Erro ao enviar email:', error);
-
+    req.pipe(busboy);
+  } catch (err: any) {
+    console.error('ERRO BACKEND:', err);
     return res.status(500).json({
       success: false,
-      message: 'Erro ao enviar a candidatura. Tente novamente mais tarde.'
+      message: 'Erro ao enviar email',
     });
   }
 }
