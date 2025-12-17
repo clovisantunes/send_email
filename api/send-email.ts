@@ -2,13 +2,10 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import nodemailer from 'nodemailer';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // ----------------------------
-  // CORS - Correto para múltiplas origens
-  // ----------------------------
   const allowedOrigins = [
     'https://cms-42v7.vercel.app',
     'https://cms-jet-one.vercel.app',
-    'http://localhost:3000'
+    'https://centroms.com.br',
   ];
   
   const origin = req.headers.origin || '';
@@ -32,9 +29,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // ----------------------------
-    // Validação de Content-Type
-    // ----------------------------
     if (!req.headers['content-type']?.includes('application/json')) {
       return res.status(400).json({
         success: false,
@@ -42,14 +36,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Log dos dados recebidos para debug
     console.log('=== DADOS RECEBIDOS ===');
     console.log('Body completo:', JSON.stringify(req.body, null, 2));
     console.log('=== FIM DADOS ===');
 
     const { nome, email, telefone, mensagem, arquivo_nome, arquivo_base64, arquivo_tipo } = req.body;
 
-    // Validação dos campos obrigatórios
     if (!nome || !email || !telefone) {
       return res.status(400).json({
         success: false,
@@ -57,7 +49,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Validação de email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({
@@ -66,31 +57,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Log das credenciais (sem mostrar valores completos)
     console.log('=== CONFIGURAÇÃO SMTP ===');
     console.log('BREVO_SMTP_USER existe:', !!process.env.BREVO_SMTP_USER);
     console.log('BREVO_SMTP_KEY existe:', !!process.env.BREVO_SMTP_KEY);
-    console.log('RH_EMAIL:', process.env.RH_EMAIL || 'suporte.ti@centroms.com.br');
+    console.log('RH_EMAIL:', process.env.RH_EMAIL);
     console.log('=== FIM CONFIGURAÇÃO ===');
 
-    // ----------------------------
-    // Configuração do Transporter SMTP
-    // ----------------------------
     const transporter = nodemailer.createTransport({
       host: 'smtp-relay.brevo.com',
       port: 587,
-      secure: false, // true para 465, false para outras portas
+      secure: false,
       auth: {
         user: process.env.BREVO_SMTP_USER,
         pass: process.env.BREVO_SMTP_KEY,
       },
-      // Timeout aumentado para arquivos grandes
       connectionTimeout: 10000,
       greetingTimeout: 10000,
       socketTimeout: 10000
     });
 
-    // Teste de conexão SMTP
     console.log('=== TESTANDO CONEXÃO SMTP ===');
     try {
       await transporter.verify();
@@ -99,7 +84,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error('❌ Erro na verificação SMTP:', verifyError.message);
       console.error('Código do erro:', verifyError.code);
       
-      // Erro específico de autenticação
       if (verifyError.code === 'EAUTH') {
         return res.status(500).json({
           success: false,
@@ -113,12 +97,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // ----------------------------
-    // Configuração do Email
-    // ----------------------------
     const mailOptions: any = {
-      from: '"Site Centro Médico Sapiranga" <suporte.ti@centroms.com.br>',
-      to: process.env.RH_EMAIL || 'suporte.ti@centroms.com.br',
+      from: '"Site Centro Médico Sapiranga" <Site@centroms.com.br>',
+      to: process.env.RH_EMAIL,
       replyTo: email,
       subject: `📋 Nova Candidatura - ${nome.substring(0, 30)}`,
       html: `
@@ -169,16 +150,12 @@ Data: ${new Date().toLocaleString('pt-BR')}
       `
     };
 
-    // ----------------------------
-    // Adicionar Anexo se Existir
-    // ----------------------------
     if (arquivo_base64 && arquivo_nome) {
       console.log('=== PROCESSANDO ANEXO ===');
       console.log('Nome do arquivo:', arquivo_nome);
       console.log('Tipo do arquivo:', arquivo_tipo);
       console.log('Tamanho do Base64:', arquivo_base64.length, 'caracteres');
       
-      // Validar Base64
       if (!isValidBase64(arquivo_base64)) {
         console.error('❌ Base64 inválido');
         return res.status(400).json({
@@ -188,11 +165,9 @@ Data: ${new Date().toLocaleString('pt-BR')}
       }
       
       try {
-        // Decodificar para verificar tamanho
         const buffer = Buffer.from(arquivo_base64, 'base64');
         console.log('✅ Base64 válido - Tamanho decodificado:', buffer.length, 'bytes');
         
-        // Limite de tamanho: 10MB (Brevo suporta até 15MB)
         const MAX_SIZE = 10 * 1024 * 1024; // 10MB
         if (buffer.length > MAX_SIZE) {
           console.error(`❌ Arquivo muito grande: ${buffer.length} bytes (limite: ${MAX_SIZE} bytes)`);
@@ -202,7 +177,6 @@ Data: ${new Date().toLocaleString('pt-BR')}
           });
         }
         
-        // Adicionar anexo
         mailOptions.attachments = [
           {
             filename: arquivo_nome,
@@ -224,9 +198,6 @@ Data: ${new Date().toLocaleString('pt-BR')}
       console.log('ℹ️ Nenhum arquivo para anexar');
     }
 
-    // ----------------------------
-    // Enviar Email
-    // ----------------------------
     console.log('=== ENVIANDO EMAIL ===');
     try {
       const info = await transporter.sendMail(mailOptions);
@@ -243,7 +214,6 @@ Data: ${new Date().toLocaleString('pt-BR')}
       console.error('❌ Erro ao enviar email:', sendError.message);
       console.error('Código do erro:', sendError.code);
       
-      // Tratamento de erros específicos
       if (sendError.code === 'EENVELOPE') {
         return res.status(500).json({
           success: false,
@@ -276,28 +246,21 @@ Data: ${new Date().toLocaleString('pt-BR')}
   }
 }
 
-// ----------------------------
-// Funções Auxiliares
-// ----------------------------
 function isValidBase64(str: string): boolean {
   try {
-    // Verifica se a string não está vazia
     if (!str || typeof str !== 'string') {
       return false;
     }
     
-    // Verifica se o tamanho é múltiplo de 4
     if (str.length % 4 !== 0) {
       return false;
     }
     
-    // Verifica caracteres válidos
     const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
     if (!base64Regex.test(str)) {
       return false;
     }
     
-    // Tenta decodificar
     Buffer.from(str, 'base64');
     return true;
     
