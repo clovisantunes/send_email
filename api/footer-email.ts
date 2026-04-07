@@ -101,39 +101,261 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       replyTo: email,
       subject: `📋 Nova Candidatura - ${nome.substring(0, 30)}`,
       html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8">
-          <style>
-            body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; }
-            .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; }
-            .header { background: #1a5f7a; color: white; padding: 20px; }
-            .content { padding: 20px; }
-            .item { margin-bottom: 10px; }
-            .label { font-weight: bold; color: #333; }
-            .footer { background: #f8f9fa; padding: 15px; border-top: 1px solid #dee2e6; font-size: 12px; color: #666; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h2>Nova candidatura recebida</h2>
-              <p>Centro Médico Sapiranga</p>
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notificação - Novo Contato via Site</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .card {
+            max-width: 520px;
+            width: 100%;
+            background: white;
+            border-radius: 32px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
+            transition: transform 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+        }
+
+        .header {
+            background: linear-gradient(105deg, #0f2b3d 0%, #1b4f6e 100%);
+            padding: 28px 32px;
+            text-align: center;
+        }
+
+        .icon {
+            background: rgba(255, 255, 255, 0.15);
+            width: 72px;
+            height: 72px;
+            margin: 0 auto 16px;
+            border-radius: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(2px);
+        }
+
+        .icon svg {
+            width: 40px;
+            height: 40px;
+            stroke: white;
+            stroke-width: 1.5;
+        }
+
+        .header h1 {
+            color: white;
+            font-size: 1.75rem;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+            margin-bottom: 6px;
+        }
+
+        .header p {
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 0.95rem;
+        }
+
+        .content {
+            padding: 32px;
+        }
+
+        .info-box {
+            background: #f8fafc;
+            border-radius: 24px;
+            padding: 20px;
+            margin-bottom: 28px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .field {
+            margin-bottom: 20px;
+        }
+
+        .field:last-child {
+            margin-bottom: 0;
+        }
+
+        .field-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            color: #4a6a8b;
+            margin-bottom: 6px;
+        }
+
+        .field-value {
+            font-size: 1rem;
+            font-weight: 500;
+            color: #0f2b3d;
+            background: white;
+            padding: 12px 16px;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            word-break: break-word;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #e6f7ec;
+            color: #1e7b48;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 4px 12px;
+            border-radius: 50px;
+            margin-top: 8px;
+        }
+
+        .message {
+            background: #fef9e3;
+            border-left: 4px solid #f5b042;
+            padding: 16px;
+            border-radius: 16px;
+            margin: 20px 0;
+            font-size: 0.9rem;
+            color: #7c5c1f;
+            line-height: 1.5;
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 28px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px 8px;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-align: center;
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+            border: none;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: #1b4f6e;
+            color: white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+
+        .btn-primary:hover {
+            background: #0f3a52;
+            transform: scale(0.98);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #1b4f6e;
+            border: 1px solid #cbd5e1;
+        }
+
+        .btn-secondary:hover {
+            background: #f1f5f9;
+            border-color: #94a3b8;
+        }
+
+        .footer-note {
+            text-align: center;
+            font-size: 0.7rem;
+            color: #7f8c9a;
+            border-top: 1px solid #edf2f7;
+            padding-top: 20px;
+            margin-top: 12px;
+        }
+
+        @media (max-width: 480px) {
+            .card {
+                border-radius: 28px;
+            }
+            .content {
+                padding: 24px;
+            }
+            .header h1 {
+                font-size: 1.4rem;
+            }
+            .actions {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="header">
+            <div class="icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 6L12 13L2 6M22 6v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6l10 7l10-7Z" />
+                    <path d="M4 4h16a2 2 0 0 1 2 2v10" />
+                </svg>
             </div>
-            <div class="content">
-              <div class="item"><span class="label">Nome:</span> ${nome}</div>
-              <div class="item"><span class="label">Email:</span> ${email}</div>
-              <div class="item"><span class="label">Telefone:</span> ${telefone}</div>
-              ${mensagem ? `<div class="item"><span class="label">Mensagem:</span><br>${mensagem.replace(/\n/g, '<br>')}</div>` : ''}
-              ${arquivo_nome ? `<div class="item"><span class="label">Currículo anexado:</span> ${arquivo_nome}</div>` : ''}
+            <h1>📬 Novo contato via site</h1>
+            <p>Alguém preencheu o formulário agora há pouco</p>
+        </div>
+
+        <div class="content">
+            <div class="info-box">
+                <div class="field">
+                    <div class="field-label">📧 E-mail do remetente</div>
+                    <div class="field-value">ana.carvalho@exemplo.com</div>
+                    <div class="badge">✔️ Verificado (domínio válido)</div>
+                </div>
+                <div class="field">
+                    <div class="field-label">👤 Nome completo</div>
+                    <div class="field-value">Ana Beatriz Carvalho</div>
+                </div>
+                <div class="field">
+                    <div class="field-label">📞 Telefone (opcional)</div>
+                    <div class="field-value">(11) 98765-4321</div>
+                </div>
+                <div class="field">
+                    <div class="field-label">🌐 Página de origem</div>
+                    <div class="field-value">/contato / página "Fale Conosco"</div>
+                </div>
             </div>
-            <div class="footer">
-              Enviado automaticamente pelo site em ${new Date().toLocaleString('pt-BR')}
+
+            <div class="message">
+                <strong>💬 Mensagem do visitante:</strong><br>
+                "Olá, gostaria de receber mais informações sobre os serviços de consultoria. Vocês atendem empresas de pequeno porte? Obrigado."
             </div>
-          </div>
-        </body>
-        </html>
+
+            <div class="actions">
+                <a href="#" class="btn btn-primary">✉️ Responder agora</a>
+                <a href="#" class="btn btn-secondary">📋 Ver no painel</a>
+            </div>
+
+            <div class="footer-note">
+                ⏱️ Recebido em 07/04/2026 às 14:32 • IP: 189.45.xxx.xx
+            </div>
+        </div>
+    </div>
+</body>
+</html>
       `,
       text: `
 Nova candidatura recebida - Centro Médico Sapiranga
